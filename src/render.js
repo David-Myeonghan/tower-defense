@@ -1,8 +1,71 @@
 import { CONFIG } from './config.js';
 import { cellToPixel } from './grid.js';
 import { towerStats } from './tower.js';
+import { selectTarget } from './targeting.js';
 
 const TOWER_COLOR = { arrow: '#5b7cff', cannon: '#ff8a5b', frost: '#5bd6ff' };
+
+// 타워를 종류별 실제 모양으로 그림. aim: 조준 각도(rad), 대상 없으면 위쪽.
+function drawTower(ctx, t, cell, aim) {
+  const R = cell * 0.34;
+  ctx.save();
+  ctx.translate(t.x, t.y);
+
+  // 공통 받침대 (돌 플랫폼)
+  ctx.fillStyle = '#2b3040';
+  ctx.strokeStyle = '#171b26'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#3a4152';
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.7, 0, Math.PI * 2); ctx.fill();
+
+  if (t.kind === 'cannon') {
+    // 포신: 회전하는 굵은 총열 + 포구
+    ctx.rotate(aim);
+    ctx.fillStyle = '#3a3f52'; ctx.strokeStyle = '#12151f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.rect(0, -R * 0.32, R * 1.15, R * 0.64); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#12151f';
+    ctx.beginPath(); ctx.arc(R * 1.1, 0, R * 0.28, 0, Math.PI * 2); ctx.fill();
+    // 포탑 몸통
+    ctx.fillStyle = '#ff8a5b'; ctx.strokeStyle = '#7a3510';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (t.kind === 'frost') {
+    // 서리: 파란 마법 크리스탈(다이아 첨탑) + 빛나는 코어
+    ctx.fillStyle = '#5bd6ff'; ctx.strokeStyle = '#1a3a4a'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 1.05); ctx.lineTo(R * 0.5, -R * 0.1); ctx.lineTo(0, R * 0.55); ctx.lineTo(-R * 0.5, -R * 0.1); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#eafaff';
+    ctx.beginPath(); ctx.arc(0, -R * 0.25, R * 0.18, 0, Math.PI * 2); ctx.fill();
+  } else {
+    // 화살탑: 궁수 포탑 + 조준하는 활 & 화살
+    ctx.fillStyle = '#5b7cff'; ctx.strokeStyle = '#233';
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.rotate(aim);
+    // 활(호)
+    ctx.strokeStyle = '#c8b45a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.85, -Math.PI * 0.55, Math.PI * 0.55); ctx.stroke();
+    // 시위
+    ctx.strokeStyle = '#e8ecff'; ctx.lineWidth = 1;
+    const bx = Math.cos(Math.PI * 0.55) * R * 0.85, by = Math.sin(Math.PI * 0.55) * R * 0.85;
+    ctx.beginPath(); ctx.moveTo(bx, -by); ctx.lineTo(bx, by); ctx.stroke();
+    // 화살
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-R * 0.3, 0); ctx.lineTo(R * 0.95, 0); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(R * 1.05, 0); ctx.lineTo(R * 0.8, -R * 0.18); ctx.lineTo(R * 0.8, R * 0.18); ctx.closePath(); ctx.fill();
+  }
+
+  ctx.restore();
+
+  // 레벨 배지
+  if (t.level > 1) {
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(t.x + R * 0.7, t.y + R * 0.7, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`${t.level}`, t.x + R * 0.7, t.y + R * 0.7 + 3);
+    ctx.textAlign = 'left';
+  }
+}
 
 // 하단 팔레트 버튼 (가상 좌표). input과 공유하기 위해 export.
 export function paletteButtons() {
@@ -26,22 +89,31 @@ function drawProjectile(ctx, fx, p) {
   const y = fx.fromY + (fx.toY - fx.fromY) * p;
 
   if (fx.kind === 'cannon') {
-    if (p < 0.98) {
+    const TRAVEL = 0.55; // 앞 55%는 이동, 뒤는 폭발(피해 범위) 표시
+    if (p < TRAVEL) {
       // 날아가는 포탄 (큰 검은 원 + 외곽선 + 하이라이트)
+      const tp = p / TRAVEL;
+      const bx = fx.fromX + (fx.toX - fx.fromX) * tp;
+      const by = fx.fromY + (fx.toY - fx.fromY) * tp;
       ctx.fillStyle = '#1a1d27';
       ctx.strokeStyle = '#3a3f52';
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#8a91a8';
-      ctx.beginPath(); ctx.arc(x - 3, y - 3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bx - 3, by - 3, 3, 0, Math.PI * 2); ctx.fill();
     } else {
-      // 착탄 폭발 링 (splash 반경)
+      // 착탄: splash 반경만큼 "피해 범위" 원 (채움 + 링), 시간에 따라 페이드
+      const bp = (p - TRAVEL) / (1 - TRAVEL); // 0→1
       const r = fx.splash;
-      ctx.fillStyle = 'rgba(255,138,91,0.28)';
+      const fade = 1 - bp;
+      ctx.fillStyle = `rgba(255,138,91,${0.35 * fade})`;
       ctx.beginPath(); ctx.arc(fx.toX, fx.toY, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,180,120,0.9)';
+      ctx.strokeStyle = `rgba(255,190,130,${0.95 * fade})`;
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(fx.toX, fx.toY, r, 0, Math.PI * 2); ctx.stroke();
+      // 중심 섬광
+      ctx.fillStyle = `rgba(255,240,200,${0.9 * fade})`;
+      ctx.beginPath(); ctx.arc(fx.toX, fx.toY, r * 0.25 * (0.5 + bp), 0, Math.PI * 2); ctx.fill();
     }
     return;
   }
@@ -147,18 +219,11 @@ export function render(ctx, state, selectedKind) {
   for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(originX + c * cell, originY); ctx.lineTo(originX + c * cell, originY + rows * cell); ctx.stroke(); }
   for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(originX, originY + r * cell); ctx.lineTo(originX + cols * cell, originY + r * cell); ctx.stroke(); }
 
-  // 타워
+  // 타워 (종류별 모양 + 현재 대상으로 조준 회전)
   for (const t of state.towers) {
-    ctx.fillStyle = TOWER_COLOR[t.kind];
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, cell * 0.32, 0, Math.PI * 2);
-    ctx.fill();
-    if (t.level > 1) {
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${t.level}`, t.x, t.y + 4);
-    }
+    const target = selectTarget(t, state.enemies, state.waypoints);
+    const aim = target ? Math.atan2(target.y - t.y, target.x - t.x) : -Math.PI / 2;
+    drawTower(ctx, t, cell, aim);
   }
 
   // 적 (캐릭터 + HP바). normal=둥근 슬라임, fast=뾰족한 돌진형. slow면 얼음 틴트.

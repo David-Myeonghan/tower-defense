@@ -76,6 +76,7 @@ window.__td = () => ({
   wave: state.wave, kills: state.kills, score: state.score,
   towers: state.towers.length, enemies: state.enemies.length, best: state.best,
   effects: (state.effects || []).length,
+  fx: (state.effects || []).map((e) => ({ kind: e.kind, p: 1 - e.ttl / (e.maxTtl || 1) })),
 });
 
 function save() { persistence.save(toSaveData(serialize(state), Date.now())); }
