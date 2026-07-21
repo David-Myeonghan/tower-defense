@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freshState, startWave, tick } from '../src/game.js';
+import { freshState, startWave, tick, serialize, deserialize } from '../src/game.js';
 import { createTower } from '../src/tower.js';
 import { CONFIG } from '../src/config.js';
 
@@ -82,6 +82,32 @@ test('game over when lives hit zero', () => {
   // 이후 tick은 no-op
   const frozen = tick(s, 1);
   assert.equal(frozen, s);
+});
+
+test('serialize/deserialize restores an in-progress game', () => {
+  let s = freshState();
+  s = { ...s, gold: 999, wave: 5, score: 12, kills: 12, lives: 8,
+        towers: [{ id: 1, kind: 'arrow', col: 5, row: 5, x: 220, y: 260, level: 3, cooldownLeft: 0 }] };
+  const restored = deserialize(serialize(s));
+  assert.equal(restored.status, 'playing');
+  assert.equal(restored.gold, 999);
+  assert.equal(restored.wave, 5);
+  assert.equal(restored.score, 12);
+  assert.equal(restored.lives, 8);
+  assert.equal(restored.towers.length, 1);
+  assert.equal(restored.towers[0].level, 3);
+  // 재빌드 필드 존재
+  assert.ok(restored.waypoints.length > 0);
+  assert.ok(restored.pathSet.size > 0);
+});
+
+test('deserialize of a game-over snapshot starts fresh but keeps best', () => {
+  const over = { status: 'over', wave: 7, gold: 0, towers: [{ id: 1 }], best: { wave: 7, score: 40 } };
+  const restored = deserialize(over);
+  assert.equal(restored.status, 'playing');
+  assert.equal(restored.wave, 1);          // 새 게임
+  assert.equal(restored.towers.length, 0); // 보드 초기화
+  assert.deepEqual(restored.best, { wave: 7, score: 40 }); // 최고기록 유지
 });
 
 test('wave clears and advances when all spawned and cleared', () => {

@@ -32,6 +32,39 @@ export function startWave(state, wave) {
   return { ...state, wave, spawn: { remaining: plan.count, timer: 0, index: 0 } };
 }
 
+// 저장용 스냅샷: 재개에 필요한 필드만 (waypoints/pathSet는 재빌드, effects는 일시적이라 제외).
+export function serialize(state) {
+  return {
+    status: state.status,
+    timeSec: state.timeSec,
+    lives: state.lives,
+    gold: state.gold,
+    wave: state.wave,
+    score: state.score,
+    kills: state.kills,
+    enemies: state.enemies,
+    towers: state.towers,
+    spawn: state.spawn,
+    nextId: state.nextId,
+    best: state.best,
+  };
+}
+
+// 스냅샷 복원. 진행 중이 아니면(게임오버/없음) 새 게임을 시작하되 best는 유지.
+export function deserialize(data) {
+  const base = freshState();
+  if (!data || data.status !== 'playing') {
+    return { ...base, best: (data && data.best) || base.best };
+  }
+  return {
+    ...base,
+    ...data,
+    waypoints: base.waypoints,
+    pathSet: base.pathSet,
+    effects: [],
+  };
+}
+
 // 한 틱 진행 (고정 dt). 불변 지향이나 성능 위해 새 배열 재할당.
 export function tick(state, dt) {
   if (state.status !== 'playing') return state;

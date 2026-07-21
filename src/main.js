@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { canPlace } from './grid.js';
 import { placeTower, upgradeTower } from './economy.js';
-import { freshState, tick } from './game.js';
+import { freshState, tick, serialize, deserialize } from './game.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
 import { createLoop } from './loop.js';
@@ -37,18 +37,19 @@ function onCell({ col, row }) {
   const existing = state.towers.find((t) => t.col === col && t.row === row);
   if (existing) {
     const r = upgradeTower(state, existing.id);
-    if (r.ok) state = r.state;
+    if (r.ok) { state = r.state; save(); }
     return;
   }
   if (canPlace(col, row, state)) {
     const r = placeTower(state, selectedKind, col, row);
-    if (r.ok) state = r.state;
+    if (r.ok) { state = r.state; save(); } // 설치 즉시 저장 → 새로고침 유지
   }
 }
 
 function restart() {
   const best = state.best;
   state = { ...freshState(), best }; // 최고 기록 유지
+  save();
 }
 
 attachInput(canvas, {
@@ -65,7 +66,7 @@ const loop = createLoop({
 
 (async () => {
   const saved = await persistence.load();
-  if (saved && saved.best) state = { ...state, best: saved.best };
+  if (saved && saved.game) state = deserialize(saved.game); // 진행 상태 복원 (타워·점수·웨이브)
   loop.start();
 })();
 
@@ -77,6 +78,6 @@ window.__td = () => ({
   effects: (state.effects || []).length,
 });
 
-function saveBest() { persistence.save(toSaveData(state, Date.now())); }
-setInterval(saveBest, 5000);
-window.addEventListener('beforeunload', saveBest);
+function save() { persistence.save(toSaveData(serialize(state), Date.now())); }
+setInterval(save, 5000);
+window.addEventListener('beforeunload', save);

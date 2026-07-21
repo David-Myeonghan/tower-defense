@@ -1,10 +1,11 @@
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 const KEY = 'tower-defense-save';
 
-export function toSaveData(state, now) {
+// game: 저장할 게임 스냅샷(game.serialize 결과). 불투명하게 보관.
+export function toSaveData(game, now) {
   return {
     version: SAVE_VERSION,
-    best: { wave: state.best.wave, score: state.best.score },
+    game,
     updatedAt: now,
   };
 }
