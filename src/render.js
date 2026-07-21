@@ -53,6 +53,34 @@ export function render(ctx, state, selectedKind) {
     }
   }
 
+  // 발사 이펙트 (렌더 전용): 화살/서리=트레이서 선, 대포=착탄 폭발 원
+  for (const fx of state.effects || []) {
+    const alpha = Math.max(0, Math.min(1, fx.ttl / (fx.maxTtl || 0.12)));
+    if (fx.kind === 'cannon') {
+      ctx.strokeStyle = `rgba(255,138,91,${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(fx.toX, fx.toY, fx.splash * (1 - alpha * 0.4), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255,138,91,${alpha * 0.25})`;
+      ctx.beginPath();
+      ctx.arc(fx.toX, fx.toY, fx.splash * (1 - alpha * 0.4), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = fx.kind === 'frost' ? `rgba(91,214,255,${alpha})` : `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = fx.kind === 'frost' ? 3 : 2;
+      ctx.beginPath();
+      ctx.moveTo(fx.fromX, fx.fromY);
+      ctx.lineTo(fx.toX, fx.toY);
+      ctx.stroke();
+      // 착탄점 작은 점
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.arc(fx.toX, fx.toY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // 적 (+ HP바, slow 틴트)
   for (const e of state.enemies) {
     const slowed = state.timeSec < e.slowUntil;

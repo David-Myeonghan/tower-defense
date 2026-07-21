@@ -74,6 +74,7 @@ window.__td = () => ({
   status: state.status, lives: state.lives, gold: state.gold,
   wave: state.wave, kills: state.kills, score: state.score,
   towers: state.towers.length, enemies: state.enemies.length, best: state.best,
+  effects: (state.effects || []).length,
 });
 
 function saveBest() { persistence.save(toSaveData(state, Date.now())); }

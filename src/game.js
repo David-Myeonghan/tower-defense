@@ -22,6 +22,7 @@ export function freshState() {
     betweenTimer: 0,
     nextId: 1,
     best: { wave: 1, score: 0 },
+    effects: [], // 렌더 전용 발사 이펙트 {kind,fromX,fromY,toX,toY,splash,ttl}
   };
   return startWave(state, 1);
 }
@@ -71,6 +72,12 @@ export function tick(state, dt) {
     if (killedSet.has(e.id)) { gold += killReward(e.kind, s.wave); kills++; }
   }
   s = { ...s, towers: combat.towers, enemies: combat.enemies.filter((e) => e.alive), gold, kills, score: kills };
+
+  // 발사 이펙트 갱신: 기존 이펙트 수명 감소 + 이번 틱 새 발사 추가 (렌더 전용, sim 무영향)
+  const SHOT_TTL = 0.12; // 초
+  const aged = s.effects.map((fx) => ({ ...fx, ttl: fx.ttl - dt })).filter((fx) => fx.ttl > 0);
+  for (const shot of combat.shots) aged.push({ ...shot, ttl: SHOT_TTL, maxTtl: SHOT_TTL });
+  s = { ...s, effects: aged };
 
   // 4) 웨이브 클리어 → 보너스 + 다음 웨이브
   if (s.spawn.remaining === 0 && s.enemies.length === 0) {
