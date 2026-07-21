@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>타워 디펜스 · Tower Defense</title>
+  <link rel="icon" href="data:," />
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0e14; overflow: hidden; }
+    #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    #game { background: #10141f; touch-action: none; max-width: 100%; max-height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="wrap"><canvas id="game" width="400" height="600"></canvas></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
