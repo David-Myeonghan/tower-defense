@@ -74,7 +74,7 @@ export function tick(state, dt) {
   s = { ...s, towers: combat.towers, enemies: combat.enemies.filter((e) => e.alive), gold, kills, score: kills };
 
   // 발사 이펙트 갱신: 기존 이펙트 수명 감소 + 이번 틱 새 발사 추가 (렌더 전용, sim 무영향)
-  const SHOT_TTL = 0.18; // 초 (발사체가 날아가는 연출 시간; sim 무영향)
+  const SHOT_TTL = 0.28; // 초 (발사체가 날아가는 연출 시간; sim 무영향)
   const aged = s.effects.map((fx) => ({ ...fx, ttl: fx.ttl - dt })).filter((fx) => fx.ttl > 0);
   for (const shot of combat.shots) aged.push({ ...shot, ttl: SHOT_TTL, maxTtl: SHOT_TTL });
   s = { ...s, effects: aged };

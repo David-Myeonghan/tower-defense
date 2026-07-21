@@ -27,11 +27,13 @@ function drawProjectile(ctx, fx, p) {
 
   if (fx.kind === 'cannon') {
     if (p < 0.98) {
-      // 날아가는 포탄 (검은 원 + 하이라이트)
-      ctx.fillStyle = '#2a2f3e';
-      ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#555b6e';
-      ctx.beginPath(); ctx.arc(x - 2, y - 2, 2, 0, Math.PI * 2); ctx.fill();
+      // 날아가는 포탄 (큰 검은 원 + 외곽선 + 하이라이트)
+      ctx.fillStyle = '#1a1d27';
+      ctx.strokeStyle = '#3a3f52';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#8a91a8';
+      ctx.beginPath(); ctx.arc(x - 3, y - 3, 3, 0, Math.PI * 2); ctx.fill();
     } else {
       // 착탄 폭발 링 (splash 반경)
       const r = fx.splash;
@@ -47,27 +49,81 @@ function drawProjectile(ctx, fx, p) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
+  ctx.lineJoin = 'round';
   if (fx.kind === 'frost') {
-    // 얼음 파편 (하늘색 다이아몬드)
-    ctx.fillStyle = '#8fe6ff';
-    ctx.strokeStyle = '#5bd6ff';
-    ctx.lineWidth = 1.5;
+    // 얼음 파편 (하늘색 다이아몬드, 외곽선)
+    ctx.fillStyle = '#bff0ff';
+    ctx.strokeStyle = '#1a3a4a';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(7, 0); ctx.lineTo(0, 4); ctx.lineTo(-7, 0); ctx.lineTo(0, -4); ctx.closePath();
+    ctx.moveTo(11, 0); ctx.lineTo(0, 6); ctx.lineTo(-11, 0); ctx.lineTo(0, -6); ctx.closePath();
     ctx.fill(); ctx.stroke();
   } else {
-    // 화살 (화살대 + 삼각 화살촉)
-    ctx.strokeStyle = '#e8ecff';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(6, 0); ctx.stroke();
-    ctx.fillStyle = '#ffffff';
+    // 화살: 굵은 화살대 + 큰 삼각 화살촉 + V자 깃. 배경 대비용 어두운 외곽선.
+    // 화살대
+    ctx.strokeStyle = '#12151f';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(8, 0); ctx.stroke(); // 외곽(어두움)
+    ctx.strokeStyle = '#c8b45a';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(8, 0); ctx.stroke(); // 나무색 심
+    // 화살촉 (큰 삼각형)
     ctx.beginPath();
-    ctx.moveTo(11, 0); ctx.lineTo(4, -4); ctx.lineTo(4, 4); ctx.closePath();
-    ctx.fill();
-    // 깃(뒤쪽)
-    ctx.strokeStyle = '#9fb0ff';
-    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-11, -3); ctx.moveTo(-8, 0); ctx.lineTo(-11, 3); ctx.stroke();
+    ctx.moveTo(18, 0); ctx.lineTo(6, -7); ctx.lineTo(6, 7); ctx.closePath();
+    ctx.fillStyle = '#eef1ff';
+    ctx.strokeStyle = '#12151f';
+    ctx.lineWidth = 2;
+    ctx.fill(); ctx.stroke();
+    // 깃 (뒤쪽 V 두 쌍)
+    ctx.strokeStyle = '#e05b7c';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-14, 0); ctx.lineTo(-19, -5);
+    ctx.moveTo(-14, 0); ctx.lineTo(-19, 5);
+    ctx.moveTo(-10, 0); ctx.lineTo(-15, -5);
+    ctx.moveTo(-10, 0); ctx.lineTo(-15, 5);
+    ctx.stroke();
   }
+  ctx.restore();
+}
+
+// 적 캐릭터 그리기. normal=둥근 슬라임(뿔 없음), fast=뾰족한 귀 달린 돌진형.
+function drawEnemy(ctx, e, cell, slowed) {
+  const r = cell * 0.26;
+  const body = e.kind === 'fast'
+    ? (slowed ? '#7fb0d8' : '#ff9d3c')
+    : (slowed ? '#7fb8d0' : '#e0556f');
+  const dark = e.kind === 'fast' ? '#7a4410' : '#7a2333';
+
+  ctx.save();
+  ctx.translate(e.x, e.y);
+
+  if (e.kind === 'fast') {
+    // 뾰족한 귀 두 개
+    ctx.fillStyle = body;
+    ctx.strokeStyle = dark; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-r * 0.7, -r * 0.5); ctx.lineTo(-r * 0.3, -r * 1.4); ctx.lineTo(0, -r * 0.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * 0.7, -r * 0.5); ctx.lineTo(r * 0.3, -r * 1.4); ctx.lineTo(0, -r * 0.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+
+  // 몸통
+  ctx.fillStyle = body;
+  ctx.strokeStyle = dark; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  // 눈 (흰자 + 검은자)
+  const ex = r * 0.38, ey = -r * 0.1, er = r * 0.22;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-ex, ey, er, 0, Math.PI * 2); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#12151f';
+  ctx.beginPath(); ctx.arc(-ex, ey, er * 0.5, 0, Math.PI * 2); ctx.arc(ex, ey, er * 0.5, 0, Math.PI * 2); ctx.fill();
+
+  // slow면 얼음 결정 표시
+  if (slowed) {
+    ctx.strokeStyle = 'rgba(200,240,255,0.9)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -105,20 +161,17 @@ export function render(ctx, state, selectedKind) {
     }
   }
 
-  // 적 (+ HP바, slow 틴트)
+  // 적 (캐릭터 + HP바). normal=둥근 슬라임, fast=뾰족한 돌진형. slow면 얼음 틴트.
   for (const e of state.enemies) {
     const slowed = state.timeSec < e.slowUntil;
-    ctx.fillStyle = e.kind === 'fast' ? (slowed ? '#8ad' : '#ffd95b') : (slowed ? '#7ac' : '#e05b7c');
-    ctx.beginPath();
-    ctx.arc(e.x, e.y, cell * 0.24, 0, Math.PI * 2);
-    ctx.fill();
+    drawEnemy(ctx, e, cell, slowed);
     // HP 바
     const bw = cell * 0.5;
     const ratio = Math.max(0, e.hp / e.maxHp);
     ctx.fillStyle = '#000';
-    ctx.fillRect(e.x - bw / 2, e.y - cell * 0.4, bw, 3);
+    ctx.fillRect(e.x - bw / 2, e.y - cell * 0.44, bw, 3);
     ctx.fillStyle = '#6aaa64';
-    ctx.fillRect(e.x - bw / 2, e.y - cell * 0.4, bw * ratio, 3);
+    ctx.fillRect(e.x - bw / 2, e.y - cell * 0.44, bw * ratio, 3);
   }
 
   // 발사체 (렌더 전용, 적 위에 그림): 타워→적으로 날아가는 모양 있는 발사체
