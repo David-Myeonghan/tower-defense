@@ -19,6 +19,22 @@ npm run serve
 npm test         # Node 20 내장 test runner
 ```
 
+## 배포 (라이브)
+
+**플레이: https://david-myeonghan.github.io/tower-defense/**
+
+GitHub Pages(main/root). `git push`하면 자동 갱신.
+
+## 티스토리 임베드
+
+HTML 편집 모드에서:
+
+```html
+<iframe src="https://david-myeonghan.github.io/tower-defense/"
+        width="400" height="600"
+        style="border:0;max-width:100%;aspect-ratio:2/3" loading="lazy"></iframe>
+```
+
 ## 문서
 
 - 설계: [docs/design.md](docs/design.md)
