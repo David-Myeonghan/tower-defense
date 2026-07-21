@@ -19,6 +19,58 @@ export function paletteButtons() {
   return kinds.map((k, i) => ({ ...k, x: gap + i * (w + gap), y, w, h }));
 }
 
+// 발사체 그리기. p: 0(발사)~1(착탄). fx: {kind,fromX,fromY,toX,toY,splash}
+function drawProjectile(ctx, fx, p) {
+  const angle = Math.atan2(fx.toY - fx.fromY, fx.toX - fx.fromX);
+  const x = fx.fromX + (fx.toX - fx.fromX) * p;
+  const y = fx.fromY + (fx.toY - fx.fromY) * p;
+
+  if (fx.kind === 'cannon') {
+    if (p < 0.98) {
+      // 날아가는 포탄 (검은 원 + 하이라이트)
+      ctx.fillStyle = '#2a2f3e';
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#555b6e';
+      ctx.beginPath(); ctx.arc(x - 2, y - 2, 2, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // 착탄 폭발 링 (splash 반경)
+      const r = fx.splash;
+      ctx.fillStyle = 'rgba(255,138,91,0.28)';
+      ctx.beginPath(); ctx.arc(fx.toX, fx.toY, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,180,120,0.9)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(fx.toX, fx.toY, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  if (fx.kind === 'frost') {
+    // 얼음 파편 (하늘색 다이아몬드)
+    ctx.fillStyle = '#8fe6ff';
+    ctx.strokeStyle = '#5bd6ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(7, 0); ctx.lineTo(0, 4); ctx.lineTo(-7, 0); ctx.lineTo(0, -4); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else {
+    // 화살 (화살대 + 삼각 화살촉)
+    ctx.strokeStyle = '#e8ecff';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(6, 0); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(11, 0); ctx.lineTo(4, -4); ctx.lineTo(4, 4); ctx.closePath();
+    ctx.fill();
+    // 깃(뒤쪽)
+    ctx.strokeStyle = '#9fb0ff';
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-11, -3); ctx.moveTo(-8, 0); ctx.lineTo(-11, 3); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function render(ctx, state, selectedKind) {
   const { virtualW, virtualH, hudTop } = CONFIG.display;
   const { cell, cols, rows, originX, originY } = CONFIG.grid;
@@ -53,34 +105,6 @@ export function render(ctx, state, selectedKind) {
     }
   }
 
-  // 발사 이펙트 (렌더 전용): 화살/서리=트레이서 선, 대포=착탄 폭발 원
-  for (const fx of state.effects || []) {
-    const alpha = Math.max(0, Math.min(1, fx.ttl / (fx.maxTtl || 0.12)));
-    if (fx.kind === 'cannon') {
-      ctx.strokeStyle = `rgba(255,138,91,${alpha})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(fx.toX, fx.toY, fx.splash * (1 - alpha * 0.4), 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = `rgba(255,138,91,${alpha * 0.25})`;
-      ctx.beginPath();
-      ctx.arc(fx.toX, fx.toY, fx.splash * (1 - alpha * 0.4), 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = fx.kind === 'frost' ? `rgba(91,214,255,${alpha})` : `rgba(255,255,255,${alpha})`;
-      ctx.lineWidth = fx.kind === 'frost' ? 3 : 2;
-      ctx.beginPath();
-      ctx.moveTo(fx.fromX, fx.fromY);
-      ctx.lineTo(fx.toX, fx.toY);
-      ctx.stroke();
-      // 착탄점 작은 점
-      ctx.fillStyle = ctx.strokeStyle;
-      ctx.beginPath();
-      ctx.arc(fx.toX, fx.toY, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
   // 적 (+ HP바, slow 틴트)
   for (const e of state.enemies) {
     const slowed = state.timeSec < e.slowUntil;
@@ -95,6 +119,12 @@ export function render(ctx, state, selectedKind) {
     ctx.fillRect(e.x - bw / 2, e.y - cell * 0.4, bw, 3);
     ctx.fillStyle = '#6aaa64';
     ctx.fillRect(e.x - bw / 2, e.y - cell * 0.4, bw * ratio, 3);
+  }
+
+  // 발사체 (렌더 전용, 적 위에 그림): 타워→적으로 날아가는 모양 있는 발사체
+  for (const fx of state.effects || []) {
+    const p = 1 - Math.max(0, Math.min(1, fx.ttl / (fx.maxTtl || 0.18))); // 0=발사, 1=착탄
+    drawProjectile(ctx, fx, p);
   }
 
   // 상단 HUD
