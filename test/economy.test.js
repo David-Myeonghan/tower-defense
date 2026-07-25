@@ -8,7 +8,7 @@ function baseState(gold = 200) {
 }
 
 test('killReward grows with wave', () => {
-  assert.ok(killReward('normal', 3) > killReward('normal', 1));
+  assert.ok(killReward('normal', 6) > killReward('normal', 1)); // 넓은 간격(반올림 무관)
 });
 
 test('placeTower on empty cell deducts and appends', () => {

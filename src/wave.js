@@ -10,8 +10,13 @@ export function wavePlan(wave) {
   };
 }
 
-// 웨이브 내 index번째 적 종류 (결정론). fastEveryFrom 이후 매 3번째가 fast.
+// 웨이브 내 index번째 적 종류 (결정론). 보스 웨이브면 마지막 적이 보스,
+// fastEveryFrom 이후 매 3번째가 fast, 그 외 normal.
 export function enemyKindAt(wave, index) {
+  if (wave % CONFIG.waves.bossEvery === 0) {
+    const { count } = wavePlan(wave);
+    if (index === count - 1) return 'boss'; // 웨이브 마지막에 보스 등장
+  }
   if (wave >= CONFIG.waves.fastEveryFrom && index % 3 === 2) return 'fast';
   return 'normal';
 }

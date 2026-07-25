@@ -159,8 +159,25 @@ function drawProjectile(ctx, fx, p) {
   ctx.restore();
 }
 
-// 적 캐릭터 그리기. normal=둥근 슬라임(뿔 없음), fast=뾰족한 귀 달린 돌진형.
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// 상단 재시작 버튼 (가상 좌표). input과 공유.
+export function restartButton() {
+  const { virtualW } = CONFIG.display;
+  return { x: virtualW - 40, y: 8, w: 32, h: 24 };
+}
+
+// 적 캐릭터 그리기. normal=둥근 슬라임, fast=뾰족귀 돌진형, boss=보라색 큰 왕관 몹.
 function drawEnemy(ctx, e, cell, slowed) {
+  if (e.kind === 'boss') { drawBoss(ctx, e, cell, slowed); return; }
   const r = cell * 0.26;
   const body = e.kind === 'fast'
     ? (slowed ? '#7fb0d8' : '#ff9d3c')
@@ -199,6 +216,50 @@ function drawEnemy(ctx, e, cell, slowed) {
   ctx.restore();
 }
 
+// 보스: 보라색 큰 몹 + 왕관 + 사나운 눈.
+function drawBoss(ctx, e, cell, slowed) {
+  const r = cell * 0.42; // 일반보다 큼
+  const body = slowed ? '#9a8fd8' : '#8b3fd0';
+  const dark = '#3a1a5a';
+  ctx.save();
+  ctx.translate(e.x, e.y);
+
+  // 아우라
+  ctx.fillStyle = 'rgba(139,63,208,0.22)';
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.35, 0, Math.PI * 2); ctx.fill();
+
+  // 몸통
+  ctx.fillStyle = body; ctx.strokeStyle = dark; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  // 왕관
+  ctx.fillStyle = '#ffd95b'; ctx.strokeStyle = '#8a6d1a'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.7, -r * 0.75);
+  ctx.lineTo(-r * 0.7, -r * 1.15); ctx.lineTo(-r * 0.35, -r * 0.85);
+  ctx.lineTo(0, -r * 1.3); ctx.lineTo(r * 0.35, -r * 0.85);
+  ctx.lineTo(r * 0.7, -r * 1.15); ctx.lineTo(r * 0.7, -r * 0.75);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // 사나운 눈 (붉은 눈 + 찡그린 눈썹)
+  const ex = r * 0.36, ey = -r * 0.05, er = r * 0.2;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-ex, ey, er, 0, Math.PI * 2); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#e0304a';
+  ctx.beginPath(); ctx.arc(-ex, ey, er * 0.55, 0, Math.PI * 2); ctx.arc(ex, ey, er * 0.55, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = dark; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-ex - er, ey - er * 1.2); ctx.lineTo(-ex + er, ey - er * 0.4);
+  ctx.moveTo(ex + er, ey - er * 1.2); ctx.lineTo(ex - er, ey - er * 0.4);
+  ctx.stroke();
+
+  if (slowed) {
+    ctx.strokeStyle = 'rgba(200,240,255,0.9)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function render(ctx, state, selectedKind) {
   const { virtualW, virtualH, hudTop } = CONFIG.display;
   const { cell, cols, rows, originX, originY } = CONFIG.grid;
@@ -230,13 +291,15 @@ export function render(ctx, state, selectedKind) {
   for (const e of state.enemies) {
     const slowed = state.timeSec < e.slowUntil;
     drawEnemy(ctx, e, cell, slowed);
-    // HP 바
-    const bw = cell * 0.5;
+    // HP 바 (보스는 더 넓고 위쪽)
+    const boss = e.kind === 'boss';
+    const bw = cell * (boss ? 0.9 : 0.5);
+    const by = e.y - cell * (boss ? 0.62 : 0.44);
     const ratio = Math.max(0, e.hp / e.maxHp);
     ctx.fillStyle = '#000';
-    ctx.fillRect(e.x - bw / 2, e.y - cell * 0.44, bw, 3);
-    ctx.fillStyle = '#6aaa64';
-    ctx.fillRect(e.x - bw / 2, e.y - cell * 0.44, bw * ratio, 3);
+    ctx.fillRect(e.x - bw / 2, by, bw, boss ? 4 : 3);
+    ctx.fillStyle = boss ? '#c94b8f' : '#6aaa64';
+    ctx.fillRect(e.x - bw / 2, by, bw * ratio, boss ? 4 : 3);
   }
 
   // 발사체 (렌더 전용, 적 위에 그림): 타워→적으로 날아가는 모양 있는 발사체
@@ -253,9 +316,20 @@ export function render(ctx, state, selectedKind) {
   ctx.textAlign = 'left';
   ctx.fillText(`Wave ${state.wave}`, 8, 26);
   ctx.textAlign = 'center';
-  ctx.fillText(`❤ ${state.lives}`, virtualW / 2, 26);
+  ctx.fillText(`❤ ${state.lives}`, virtualW / 2 - 16, 26);
+
+  // 재시작 버튼
+  const rb = restartButton();
+  ctx.fillStyle = '#26314f';
+  ctx.strokeStyle = '#3a4670'; ctx.lineWidth = 1;
+  roundRect(ctx, rb.x, rb.y, rb.w, rb.h, 5); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#cdd6ff';
+  ctx.font = '15px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('↻', rb.x + rb.w / 2, rb.y + 17);
+  ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(`💰 ${state.gold}`, virtualW - 8, 26);
+  ctx.fillText(`💰 ${state.gold}`, rb.x - 8, 26);
 
   // 하단 팔레트
   ctx.textAlign = 'center';

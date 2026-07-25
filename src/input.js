@@ -1,6 +1,10 @@
 import { CONFIG } from './config.js';
 import { pixelToCell } from './grid.js';
-import { paletteButtons } from './render.js';
+import { paletteButtons, restartButton } from './render.js';
+
+function inRect(pos, b) {
+  return pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h;
+}
 
 // 클라이언트 좌표 → 가상 좌표 (CSS 스케일 보정). idle-brick-breaker와 동일.
 export function toVirtual(clientX, clientY, rect, virtualW, virtualH) {
@@ -26,6 +30,8 @@ export function attachInput(canvas, handlers) {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const pos = toVirtual(e.clientX, e.clientY, rect, CONFIG.display.virtualW, CONFIG.display.virtualH);
+    // 재시작 버튼은 어떤 상태에서든 최우선
+    if (inRect(pos, restartButton())) { handlers.onRestart(); return; }
     if (handlers.isOverlay && handlers.isOverlay()) { handlers.onOverlay(); return; }
     const kind = hitButton(pos, paletteButtons());
     if (kind) { handlers.onPalette(kind); return; }

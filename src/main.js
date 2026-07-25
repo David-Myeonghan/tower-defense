@@ -55,6 +55,7 @@ function restart() {
 attachInput(canvas, {
   isOverlay: () => state.status === 'over',
   onOverlay: restart,
+  onRestart: restart,
   onPalette,
   onCell,
 });
@@ -77,6 +78,7 @@ window.__td = () => ({
   towers: state.towers.length, enemies: state.enemies.length, best: state.best,
   effects: (state.effects || []).length,
   fx: (state.effects || []).map((e) => ({ kind: e.kind, p: 1 - e.ttl / (e.maxTtl || 1) })),
+  enemyKinds: state.enemies.map((e) => e.kind),
 });
 
 function save() { persistence.save(toSaveData(serialize(state), Date.now())); }

@@ -14,11 +14,13 @@ export const CONFIG = {
     frost: { baseCost: 55, range: 80, damage: 2, fireRate: 1.0, slowFactor: 0.5, slowDuration: 1.5, costGrowth: 1.5, dmgGrowth: 1.2, rangeGrowth: 1.05 },
   },
   enemies: {
-    normal: { baseHP: 12, speed: 55, reward: 4 },
-    fast: { baseHP: 8, speed: 100, reward: 6 },
-    hpGrowth: 1.18,
+    normal: { baseHP: 12, speed: 55, reward: 3 },
+    fast: { baseHP: 8, speed: 100, reward: 5 },
+    boss: { baseHP: 80, speed: 34, reward: 30 }, // 보라색 보스: 느리고 아주 단단
+    hpGrowth: 1.22,
   },
-  waves: { baseCount: 6, countGrowth: 1.15, baseInterval: 0.9, minInterval: 0.35, intervalDecay: 0.97, fastEveryFrom: 3 },
+  // bossEvery: 보스 등장 주기(웨이브). 트렌드상 마이너 보스는 5웨이브 관례.
+  waves: { baseCount: 6, countGrowth: 1.17, baseInterval: 0.9, minInterval: 0.35, intervalDecay: 0.97, fastEveryFrom: 3, bossEvery: 5 },
 };
 
 // 적 HP: 웨이브(1-based)마다 지수 성장.

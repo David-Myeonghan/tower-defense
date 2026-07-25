@@ -20,3 +20,12 @@ test('enemyKindAt deterministic, fast only from fastEveryFrom', () => {
   assert.equal(enemyKindAt(3, 0), 'normal');
   assert.equal(enemyKindAt(3, 2), enemyKindAt(3, 2)); // deterministic
 });
+
+test('boss appears as last enemy on boss waves', () => {
+  const bossWave = CONFIG.waves.bossEvery; // 5
+  const last = wavePlan(bossWave).count - 1;
+  assert.equal(enemyKindAt(bossWave, last), 'boss');
+  assert.equal(enemyKindAt(bossWave, 0), 'normal'); // 다른 인덱스는 보스 아님
+  // 보스 웨이브가 아니면 보스 없음
+  assert.notEqual(enemyKindAt(bossWave + 1, wavePlan(bossWave + 1).count - 1), 'boss');
+});

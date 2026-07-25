@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { CONFIG, enemyHP, towerStat } from '../src/config.js';
 
 test('enemyHP base and growth', () => {
-  assert.equal(enemyHP('normal', 1), 12);
-  assert.equal(enemyHP('normal', 2), Math.round(12 * 1.18));
+  assert.equal(enemyHP('normal', 1), CONFIG.enemies.normal.baseHP);
+  assert.equal(enemyHP('normal', 2), Math.round(CONFIG.enemies.normal.baseHP * CONFIG.enemies.hpGrowth));
   assert.ok(enemyHP('normal', 5) > enemyHP('normal', 4));
+  // 지수 성장이 리니어보다 가팔라야 함(웨이브 간격이 커질수록 증가폭도 커짐)
+  const d1 = enemyHP('normal', 6) - enemyHP('normal', 5);
+  const d2 = enemyHP('normal', 11) - enemyHP('normal', 10);
+  assert.ok(d2 > d1, 'HP 증가폭이 후반에 더 커야 함(지수)');
 });
 
 test('towerStat level 1 equals base, grows with level', () => {
