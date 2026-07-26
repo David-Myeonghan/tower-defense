@@ -100,6 +100,7 @@ window.__td = () => ({
   enemyKinds: state.enemies.map((e) => e.kind),
   adRemaining: state.adRemaining || 0,
   bossHp: (state.enemies.find((e) => e.kind === 'boss') || {}).hp || null,
+  bombPhase: state.bomb ? state.bomb.phase : null,
 });
 
 function save() { persistence.save(toSaveData(serialize(state), Date.now())); }

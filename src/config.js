@@ -22,7 +22,8 @@ export const CONFIG = {
   // bossEvery: 보스 등장 주기(웨이브). 트렌드상 마이너 보스는 5웨이브 관례.
   waves: { baseCount: 6, countGrowth: 1.17, baseInterval: 0.9, minInterval: 0.35, intervalDecay: 0.97, fastEveryFrom: 3, bossEvery: 5 },
   // 한방 폭탄(리워드 광고 게이트). bossDamageRatio: 보스가 잃는 최대체력 비율.
-  bomb: { bossDamageRatio: 0.5, adSeconds: 3, flashSeconds: 0.6 },
+  // 연출: 낙하(dropSeconds) → 폭발/충격파(blastSeconds, blastMaxR까지 퍼지며 닿는 몹부터 죽임).
+  bomb: { bossDamageRatio: 0.5, adSeconds: 3, dropSeconds: 0.5, flashSeconds: 0.6, blastSeconds: 0.6, blastMaxR: 420 },
 };
 
 // 적 HP: 웨이브(1-based)마다 지수 성장.

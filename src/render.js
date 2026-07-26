@@ -68,18 +68,25 @@ function drawTower(ctx, t, cell, aim) {
 }
 
 // 하단 팔레트 버튼 (가상 좌표). input과 공유하기 위해 export.
-export function paletteButtons() {
+// 하단 줄 레이아웃: 타워 3칸 + 폭탄 1칸(오른쪽 끝). 팔레트/폭탄이 공유.
+function bottomRow() {
   const { virtualW, virtualH, hudBottom } = CONFIG.display;
+  const gap = 8;
+  const bombW = 56;
+  const towerW = (virtualW - gap * 5 - bombW) / 3;
+  const h = hudBottom - gap * 2;
+  const y = virtualH - hudBottom + gap;
+  return { gap, bombW, towerW, h, y };
+}
+
+export function paletteButtons() {
   const kinds = [
     { kind: 'arrow', label: '화살' },
     { kind: 'cannon', label: '대포' },
     { kind: 'frost', label: '서리' },
   ];
-  const gap = 8;
-  const w = (virtualW - gap * (kinds.length + 1)) / kinds.length;
-  const h = hudBottom - gap * 2;
-  const y = virtualH - hudBottom + gap;
-  return kinds.map((k, i) => ({ ...k, x: gap + i * (w + gap), y, w, h }));
+  const { gap, towerW, h, y } = bottomRow();
+  return kinds.map((k, i) => ({ ...k, x: gap + i * (towerW + gap), y, w: towerW, h }));
 }
 
 // 발사체 그리기. p: 0(발사)~1(착탄). fx: {kind,fromX,fromY,toX,toY,splash}
@@ -175,11 +182,10 @@ export function restartButton() {
   return { x: virtualW - 40, y: 8, w: 32, h: 24 };
 }
 
-// 한방 폭탄 버튼 (하단 우측 플로팅, 팔레트 위). input과 공유.
+// 한방 폭탄 버튼 (하단 팔레트 줄 오른쪽 끝, 화살/대포/서리 옆). input과 공유.
 export function bombButton() {
-  const { virtualW, virtualH, hudBottom } = CONFIG.display;
-  const size = 52;
-  return { x: virtualW - size - 8, y: virtualH - hudBottom - size - 8, w: size, h: size };
+  const { gap, bombW, towerW, h, y } = bottomRow();
+  return { x: gap + 3 * (towerW + gap), y, w: bombW, h };
 }
 
 // 적 캐릭터 그리기. normal=둥근 슬라임, fast=뾰족귀 돌진형, boss=보라색 큰 왕관 몹.
@@ -309,21 +315,47 @@ export function render(ctx, state, selectedKind) {
     ctx.fillRect(e.x - bw / 2, by, bw * ratio, boss ? 4 : 3);
   }
 
-  // 발사체 + 폭탄 섬광 (렌더 전용, 적 위에 그림)
+  // 발사체 + 폭탄 섬광 + 죽는 파티클 (렌더 전용, 적 위에 그림)
   for (const fx of state.effects || []) {
     const p = 1 - Math.max(0, Math.min(1, fx.ttl / (fx.maxTtl || 0.18))); // 0=시작, 1=끝
     if (fx.kind === 'bomb') {
       // 전체 화면 섬광 (흰→투명 페이드)
       ctx.fillStyle = `rgba(255,240,200,${0.7 * (1 - p)})`;
       ctx.fillRect(0, 0, virtualW, virtualH);
-      // 퍼지는 링
-      const R = (virtualH * 0.7) * p;
+      // 퍼지는 충격파 링 (kill 반경과 일치)
+      const R = CONFIG.bomb.blastMaxR * p;
       ctx.strokeStyle = `rgba(255,180,90,${0.9 * (1 - p)})`;
       ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.arc(virtualW / 2, virtualH / 2, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(fx.x, fx.y, R, 0, Math.PI * 2); ctx.stroke();
+      continue;
+    }
+    if (fx.kind === 'death') {
+      // 몹이 터지는 파티클: 확장+페이드 링 + 사방으로 튀는 조각
+      const col = fx.ekind === 'fast' ? '255,157,60' : '224,85,111';
+      const r = 8 + 16 * p;
+      ctx.strokeStyle = `rgba(${col},${1 - p})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(fx.x, fx.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = `rgba(${col},${1 - p})`;
+      for (let k = 0; k < 6; k++) {
+        const a = (Math.PI * 2 * k) / 6;
+        const d = 4 + 18 * p;
+        ctx.beginPath(); ctx.arc(fx.x + Math.cos(a) * d, fx.y + Math.sin(a) * d, 2.5 * (1 - p), 0, Math.PI * 2); ctx.fill();
+      }
       continue;
     }
     drawProjectile(ctx, fx, p);
+  }
+
+  // 낙하하는 폭탄 (drop 단계): 상단에서 중앙으로
+  if (state.bomb && state.bomb.phase === 'drop') {
+    const prog = Math.min(1, state.bomb.t / CONFIG.bomb.dropSeconds);
+    const by = -30 + (state.bomb.y + 30) * prog; // 화면 위 밖 → 중앙
+    ctx.save();
+    ctx.font = '40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('💣', state.bomb.x, by);
+    ctx.restore();
+    ctx.textAlign = 'left';
   }
 
   // 상단 HUD

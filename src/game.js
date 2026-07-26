@@ -5,27 +5,54 @@ import { tickCooldowns, stepCombat } from './combat.js';
 import { wavePlan, enemyKindAt } from './wave.js';
 import { killReward } from './economy.js';
 
-// 한방 폭탄: 일반·빠름 몹 전부 제거, 보스는 최대체력 비율만큼 감소(생존). 순수, {ok,state}.
+// 한방 폭탄: 즉시 제거가 아니라 "연출 시퀀스"를 시작한다.
+// 낙하(drop) → 폭발/충격파(blast)가 퍼지며 닿는 몹부터 죽음. 연출 진행은 tick(tickBomb)이 담당.
 // 광고(리워드) 시청 성공 후 main에서 호출. tick 밖의 플레이어 액션(placeTower와 동일 패턴).
-export function applyBomb(state, cfg = CONFIG) {
+export function applyBomb(state) {
   if (state.enemies.length === 0) return { ok: false, state }; // 없으면 낭비 방지
-  let gold = state.gold;
-  let kills = state.kills;
-  const survivors = [];
-  for (const e of state.enemies) {
-    if (e.kind === 'boss') {
-      const hp = Math.max(1, Math.round(e.maxHp * (1 - cfg.bomb.bossDamageRatio)));
-      survivors.push({ ...e, hp: Math.min(e.hp, hp) }); // 이미 더 낮으면 유지
-    } else {
-      gold += killReward(e.kind, state.wave);
-      kills += 1;
+  const bomb = { phase: 'drop', t: 0, x: CONFIG.display.virtualW / 2, y: CONFIG.display.virtualH / 2 };
+  return { ok: true, state: { ...state, bomb } };
+}
+
+// 폭탄 연출 진행 (보드 정지: spawn/move/combat 스킵, 폭탄과 이펙트만 갱신). 순수.
+function tickBomb(state, dt, cfg = CONFIG) {
+  let s = state;
+  // 이펙트 수명 감소
+  let effects = s.effects.map((fx) => ({ ...fx, ttl: fx.ttl - dt })).filter((fx) => fx.ttl > 0);
+  const b = { ...s.bomb, t: s.bomb.t + dt };
+
+  if (b.phase === 'drop') {
+    if (b.t >= cfg.bomb.dropSeconds) {
+      // 착탄 → 폭발: 섬광 + 보스 즉시 반피, blast 단계로.
+      effects = [...effects, { kind: 'bomb', x: b.x, y: b.y, ttl: cfg.bomb.flashSeconds, maxTtl: cfg.bomb.flashSeconds }];
+      const enemies = s.enemies.map((e) => {
+        if (e.kind !== 'boss') return e;
+        const hp = Math.max(1, Math.round(e.maxHp * (1 - cfg.bomb.bossDamageRatio)));
+        return { ...e, hp: Math.min(e.hp, hp) };
+      });
+      return { ...s, enemies, effects, bomb: { ...b, phase: 'blast', t: 0 } };
     }
+    return { ...s, effects, bomb: b };
   }
-  const flash = { kind: 'bomb', ttl: cfg.bomb.flashSeconds, maxTtl: cfg.bomb.flashSeconds };
-  return {
-    ok: true,
-    state: { ...state, enemies: survivors, gold, kills, score: kills, effects: [...state.effects, flash] },
-  };
+
+  // blast: 충격파 반경 R까지 닿은 일반몹을 죽임(순차적으로 바깥으로).
+  const R = cfg.bomb.blastMaxR * Math.min(1, b.t / cfg.bomb.blastSeconds);
+  const remaining = [];
+  let gold = s.gold, kills = s.kills;
+  for (const e of s.enemies) {
+    if (e.kind !== 'boss') {
+      const d = Math.hypot(e.x - b.x, e.y - b.y);
+      if (d <= R) {
+        gold += killReward(e.kind, s.wave);
+        kills += 1;
+        effects = [...effects, { kind: 'death', ekind: e.kind, x: e.x, y: e.y, ttl: 0.35, maxTtl: 0.35 }];
+        continue; // 죽음(제거)
+      }
+    }
+    remaining.push(e);
+  }
+  const done = b.t >= cfg.bomb.blastSeconds;
+  return { ...s, enemies: remaining, gold, kills, score: kills, effects, bomb: done ? null : b };
 }
 
 export function freshState() {
@@ -45,6 +72,7 @@ export function freshState() {
     betweenTimer: 0,
     nextId: 1,
     best: { wave: 1, score: 0 },
+    bomb: null, // 폭탄 연출 시퀀스 {phase,t,x,y} (저장 제외, 일시적)
     effects: [], // 렌더 전용 발사 이펙트 {kind,fromX,fromY,toX,toY,splash,ttl}
   };
   return startWave(state, 1);
@@ -84,6 +112,7 @@ export function deserialize(data) {
     ...data,
     waypoints: base.waypoints,
     pathSet: base.pathSet,
+    bomb: null,
     effects: [],
   };
 }
@@ -93,6 +122,9 @@ export function tick(state, dt) {
   if (state.status !== 'playing') return state;
 
   let s = { ...state, timeSec: state.timeSec + dt };
+
+  // 폭탄 연출 중이면 보드 정지 — 폭탄/이펙트만 진행
+  if (s.bomb) return tickBomb(s, dt);
 
   // 1) 스폰
   const plan = wavePlan(s.wave);
