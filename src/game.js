@@ -5,6 +5,29 @@ import { tickCooldowns, stepCombat } from './combat.js';
 import { wavePlan, enemyKindAt } from './wave.js';
 import { killReward } from './economy.js';
 
+// 한방 폭탄: 일반·빠름 몹 전부 제거, 보스는 최대체력 비율만큼 감소(생존). 순수, {ok,state}.
+// 광고(리워드) 시청 성공 후 main에서 호출. tick 밖의 플레이어 액션(placeTower와 동일 패턴).
+export function applyBomb(state, cfg = CONFIG) {
+  if (state.enemies.length === 0) return { ok: false, state }; // 없으면 낭비 방지
+  let gold = state.gold;
+  let kills = state.kills;
+  const survivors = [];
+  for (const e of state.enemies) {
+    if (e.kind === 'boss') {
+      const hp = Math.max(1, Math.round(e.maxHp * (1 - cfg.bomb.bossDamageRatio)));
+      survivors.push({ ...e, hp: Math.min(e.hp, hp) }); // 이미 더 낮으면 유지
+    } else {
+      gold += killReward(e.kind, state.wave);
+      kills += 1;
+    }
+  }
+  const flash = { kind: 'bomb', ttl: cfg.bomb.flashSeconds, maxTtl: cfg.bomb.flashSeconds };
+  return {
+    ok: true,
+    state: { ...state, enemies: survivors, gold, kills, score: kills, effects: [...state.effects, flash] },
+  };
+}
+
 export function freshState() {
   const state = {
     status: 'playing',
