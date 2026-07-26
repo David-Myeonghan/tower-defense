@@ -1,11 +1,12 @@
 import { CONFIG } from './config.js';
 import { canPlace } from './grid.js';
 import { placeTower, upgradeTower } from './economy.js';
-import { freshState, tick, serialize, deserialize } from './game.js';
+import { freshState, tick, serialize, deserialize, applyBomb } from './game.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
 import { createLoop } from './loop.js';
 import { createPersistence, toSaveData } from './persistence.js';
+import { createRewardedAd } from './ads.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -52,10 +53,28 @@ function restart() {
   save();
 }
 
+const ad = createRewardedAd();
+
+// 폭탄: 광고(목업) 시청 완료 → 화면 몹 제거. 광고 중 게임 일시정지(status:'ad').
+async function onBomb() {
+  if (state.status !== 'playing' || state.enemies.length === 0) return; // 없으면 광고 낭비 방지
+  state = { ...state, status: 'ad', adRemaining: CONFIG.bomb.adSeconds };
+  const ok = await ad.showRewardedAd({
+    onStart: (s) => { state = { ...state, adRemaining: s }; },
+    onProgress: (r) => { state = { ...state, adRemaining: r }; },
+  });
+  if (state.status !== 'ad') return; // 도중 상태 변경 방어
+  const back = { ...state, status: 'playing', adRemaining: 0 };
+  if (ok) { const r = applyBomb(back); state = r.ok ? r.state : back; save(); }
+  else state = back;
+}
+
 attachInput(canvas, {
+  isAd: () => state.status === 'ad',
   isOverlay: () => state.status === 'over',
   onOverlay: restart,
   onRestart: restart,
+  onBomb,
   onPalette,
   onCell,
 });
@@ -79,6 +98,8 @@ window.__td = () => ({
   effects: (state.effects || []).length,
   fx: (state.effects || []).map((e) => ({ kind: e.kind, p: 1 - e.ttl / (e.maxTtl || 1) })),
   enemyKinds: state.enemies.map((e) => e.kind),
+  adRemaining: state.adRemaining || 0,
+  bossHp: (state.enemies.find((e) => e.kind === 'boss') || {}).hp || null,
 });
 
 function save() { persistence.save(toSaveData(serialize(state), Date.now())); }

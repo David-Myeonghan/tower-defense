@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { pixelToCell } from './grid.js';
-import { paletteButtons, restartButton } from './render.js';
+import { paletteButtons, restartButton, bombButton } from './render.js';
 
 function inRect(pos, b) {
   return pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h;
@@ -30,9 +30,13 @@ export function attachInput(canvas, handlers) {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const pos = toVirtual(e.clientX, e.clientY, rect, CONFIG.display.virtualW, CONFIG.display.virtualH);
+    // 광고(목업) 재생 중엔 입력 무시
+    if (handlers.isAd && handlers.isAd()) return;
     // 재시작 버튼은 어떤 상태에서든 최우선
     if (inRect(pos, restartButton())) { handlers.onRestart(); return; }
     if (handlers.isOverlay && handlers.isOverlay()) { handlers.onOverlay(); return; }
+    // 폭탄 버튼 (팔레트/셀보다 먼저)
+    if (handlers.onBomb && inRect(pos, bombButton())) { handlers.onBomb(); return; }
     const kind = hitButton(pos, paletteButtons());
     if (kind) { handlers.onPalette(kind); return; }
     handlers.onCell(pointerToCell(pos));

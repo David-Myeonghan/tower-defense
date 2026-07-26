@@ -175,6 +175,13 @@ export function restartButton() {
   return { x: virtualW - 40, y: 8, w: 32, h: 24 };
 }
 
+// 한방 폭탄 버튼 (하단 우측 플로팅, 팔레트 위). input과 공유.
+export function bombButton() {
+  const { virtualW, virtualH, hudBottom } = CONFIG.display;
+  const size = 52;
+  return { x: virtualW - size - 8, y: virtualH - hudBottom - size - 8, w: size, h: size };
+}
+
 // 적 캐릭터 그리기. normal=둥근 슬라임, fast=뾰족귀 돌진형, boss=보라색 큰 왕관 몹.
 function drawEnemy(ctx, e, cell, slowed) {
   if (e.kind === 'boss') { drawBoss(ctx, e, cell, slowed); return; }
@@ -302,9 +309,20 @@ export function render(ctx, state, selectedKind) {
     ctx.fillRect(e.x - bw / 2, by, bw * ratio, boss ? 4 : 3);
   }
 
-  // 발사체 (렌더 전용, 적 위에 그림): 타워→적으로 날아가는 모양 있는 발사체
+  // 발사체 + 폭탄 섬광 (렌더 전용, 적 위에 그림)
   for (const fx of state.effects || []) {
-    const p = 1 - Math.max(0, Math.min(1, fx.ttl / (fx.maxTtl || 0.18))); // 0=발사, 1=착탄
+    const p = 1 - Math.max(0, Math.min(1, fx.ttl / (fx.maxTtl || 0.18))); // 0=시작, 1=끝
+    if (fx.kind === 'bomb') {
+      // 전체 화면 섬광 (흰→투명 페이드)
+      ctx.fillStyle = `rgba(255,240,200,${0.7 * (1 - p)})`;
+      ctx.fillRect(0, 0, virtualW, virtualH);
+      // 퍼지는 링
+      const R = (virtualH * 0.7) * p;
+      ctx.strokeStyle = `rgba(255,180,90,${0.9 * (1 - p)})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(virtualW / 2, virtualH / 2, R, 0, Math.PI * 2); ctx.stroke();
+      continue;
+    }
     drawProjectile(ctx, fx, p);
   }
 
@@ -348,6 +366,44 @@ export function render(ctx, state, selectedKind) {
     ctx.fillText(`💰${cost}`, btn.x + btn.w / 2, btn.y + 40);
   }
   ctx.textAlign = 'left';
+
+  // 한방 폭탄 버튼 (하단 우측 플로팅). 위기(라이프 낮음·적 많음)면 강조 펄스.
+  if (state.status === 'playing') {
+    const bb = bombButton();
+    const danger = state.lives <= 8 || state.enemies.length >= 8;
+    const pulse = danger ? 0.5 + 0.5 * Math.sin(state.timeSec * 6) : 0;
+    ctx.save();
+    ctx.fillStyle = danger ? `rgba(240,90,70,${0.85 + 0.15 * pulse})` : '#3a2540';
+    ctx.strokeStyle = danger ? '#ffd08a' : '#5a3f6a';
+    ctx.lineWidth = danger ? 2 + 2 * pulse : 1.5;
+    roundRect(ctx, bb.x, bb.y, bb.w, bb.h, 12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = '22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('💣', bb.x + bb.w / 2, bb.y + 28);
+    ctx.font = 'bold 8px sans-serif';
+    ctx.fillStyle = '#ffe6a0';
+    ctx.fillText('AD', bb.x + bb.w / 2, bb.y + bb.h - 6);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
+
+  // 광고(목업) 오버레이
+  if (state.status === 'ad') {
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(0, 0, virtualW, virtualH);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('광고 시청 중…', virtualW / 2, virtualH / 2 - 24);
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillStyle = '#ffd08a';
+    ctx.fillText(`${Math.max(0, Math.ceil(state.adRemaining || 0))}`, virtualW / 2, virtualH / 2 + 24);
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = '#9aa3c0';
+    ctx.fillText('(목업 광고 · 실제 앱에선 리워드 광고)', virtualW / 2, virtualH / 2 + 60);
+    ctx.textAlign = 'left';
+  }
 
   // 게임오버 오버레이
   if (state.status === 'over') {
